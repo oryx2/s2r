@@ -9,8 +9,6 @@ DEFAULT_BASE_URL="https://raw.githubusercontent.com/oryx2/s2r/main/dist"
 BASE_URL="${SCREEN2REPORT_BASE_URL:-${DEFAULT_BASE_URL}}"
 VERSION="${SCREEN2REPORT_VERSION:-latest}"
 INSTALL_DIR="${SCREEN2REPORT_INSTALL_DIR:-${HOME}/.screen2report}"
-REPORT_HOUR="${REPORT_HOUR:-18}"
-REPORT_MINUTE="${REPORT_MINUTE:-30}"
 SKIP_AUTOINSTALL=0
 SKIP_MODEL_CHECK=0
 MODEL_REPO_ID="${MODEL_REPO_ID:-Qwen/Qwen3.5-0.8B}"
@@ -23,9 +21,7 @@ Options:
   --version <v>         Install specific version (default: latest)
   --base-url <url>      Release files base URL (default: https://openclaw.ai/dist)
   --install-dir <path>  Install target directory (default: ~/.screen2report)
-  --report-hour <0-23>  launchd report hour (default: 18)
-  --report-minute <0-59> launchd report minute (default: 30)
-  --skip-autoinstall    Do not run scripts/install_bundle.sh automatically
+  --skip-autoinstall    Do not run post-install setup
   --skip-model-check    Skip model check and auto-download
   --model-repo-id <id>  Model repository ID (default: Qwen/Qwen3.5-0.8B)
   -h, --help            Show this help
@@ -34,8 +30,6 @@ Environment overrides:
   SCREEN2REPORT_BASE_URL
   SCREEN2REPORT_VERSION
   SCREEN2REPORT_INSTALL_DIR
-  REPORT_HOUR
-  REPORT_MINUTE
 EOF
 }
 
@@ -51,14 +45,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --install-dir)
       INSTALL_DIR="$2"
-      shift 2
-      ;;
-    --report-hour)
-      REPORT_HOUR="$2"
-      shift 2
-      ;;
-    --report-minute)
-      REPORT_MINUTE="$2"
       shift 2
       ;;
     --skip-autoinstall)
@@ -153,17 +139,12 @@ echo "[OK] installed to: ${INSTALL_DIR}"
 
 if [[ "${SKIP_AUTOINSTALL}" -eq 1 ]]; then
   echo "[INFO] skipped install_bundle.sh by request"
-  echo "[INFO] run manually:"
-  echo "  cd \"${INSTALL_DIR}\" && BUILD_SWIFT_BINARIES=0 bash scripts/install_bundle.sh"
   exit 0
 fi
 
-echo "[INFO] installing launchd jobs..."
+echo "[INFO] running post-install setup..."
 (
   cd "${INSTALL_DIR}"
-  BUILD_SWIFT_BINARIES=0 \
-  REPORT_HOUR="${REPORT_HOUR}" \
-  REPORT_MINUTE="${REPORT_MINUTE}" \
   bash scripts/install_bundle.sh
 )
 
