@@ -18,8 +18,8 @@ curl -fsSL https://raw.githubusercontent.com/oryx2/s2r/main/install.sh | bash
 
 安装脚本会自动：
 1. 下载并解压应用包
-2. 检查本地模型，无则自动下载（默认：Qwen/Qwen3.5-0.8B）
-3. 启动本地模型服务（后台运行）
+2. 检查本地模型，如存在则自动启动服务
+3. 如模型不存在，提示手动下载
 
 ### CLI 命令
 

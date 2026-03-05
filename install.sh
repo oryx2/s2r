@@ -165,56 +165,27 @@ if [[ "${SKIP_MODEL_CHECK}" -eq 0 ]]; then
   if [[ "${has_model}" -eq 0 ]]; then
     echo ""
     echo "============================================"
-    echo "  [INFO] 本地模型未找到，开始自动下载..."
+    echo "  [WARN] 本地模型未找到"
     echo "============================================"
     echo "  模型: ${MODEL_REPO_ID}"
     echo "  目录: ${MODEL_DIR}"
+    echo ""
+    echo "  请手动下载模型:"
+    echo "  1. 访问 https://modelscope.cn/models/${MODEL_REPO_ID}"
+    echo "  2. 下载 .gguf 文件到 ${MODEL_DIR}/"
+    echo ""
+    echo "  或使用 Hugging Face:"
+    echo "  huggingface-cli download ${MODEL_REPO_ID} --local-dir ${MODEL_DIR}"
     echo "============================================"
     echo ""
-
-    "${INSTALL_DIR}/bin/s2r" model download \
-      --repo-id "${MODEL_REPO_ID}" \
-      --models-dir "${MODELS_DIR}"
-
-    echo ""
-    echo "[OK] 模型下载完成"
+    echo "[INFO] 安装完成，但模型需要手动下载"
   else
     echo "[INFO] 本地模型已存在: ${MODEL_DIR}"
-  fi
 
-  # --- 启动模型服务 ---
-  echo ""
-  echo "[INFO] 正在启动本地模型服务..."
-  echo ""
-
-  # 创建日志目录
-  mkdir -p "${INSTALL_DIR}/logs"
-
-  # 获取 llama-server 路径
-  LLAMA_BINARY="$(bash "${INSTALL_DIR}/scripts/ensure_llama_server.sh")"
-
-  # 使用 nohup 在后台启动服务，并将日志输出到文件
-  nohup "${INSTALL_DIR}/bin/s2r" model serve \
-    --model-path "${MODEL_DIR}" \
-    --model-name "${REPO_SHORT}" \
-    --host "127.0.0.1" \
-    --port "8000" \
-    --llama-binary "${LLAMA_BINARY}" \
-    > "${INSTALL_DIR}/logs/model_server.log" 2>&1 &
-
-  SERVER_PID=$!
-  echo "[INFO] 模型服务已启动 (PID: ${SERVER_PID})"
-  echo "[INFO] 日志文件: ${INSTALL_DIR}/logs/model_server.log"
-
-  # 等待服务就绪
-  echo "[INFO] 等待服务就绪..."
-  sleep 2
-
-  # 检查服务是否正常运行
-  if kill -0 "${SERVER_PID}" 2>/dev/null; then
-    echo "[OK] 模型服务运行中"
-  else
-    echo "[WARN] 模型服务可能未正常启动，请检查日志"
+    # --- 启动模型服务 ---
+    echo ""
+    echo "[INFO] 正在启动本地模型服务..."
+    cd "${INSTALL_DIR}" && "${INSTALL_DIR}/bin/s2r" start
   fi
 fi
 
@@ -223,7 +194,8 @@ echo "[OK] 安装完成!"
 echo ""
 echo "[INFO] 安装目录: ${INSTALL_DIR}"
 echo "[INFO] 二进制文件: ${INSTALL_DIR}/bin/s2r"
-if [[ "${SKIP_MODEL_CHECK}" -eq 0 && "${has_model}" -eq 0 ]]; then
-  echo "[INFO] 模型服务已启动，API 地址: http://127.0.0.1:8000/v1"
-fi
-echo "[INFO] 测试命令: ${INSTALL_DIR}/bin/s2r capture --dry-run --base-dir \"${INSTALL_DIR}\""
+echo ""
+echo "使用说明:"
+echo "  s2r start   # 启动模型服务"
+echo "  s2r stop    # 停止模型服务"
+echo "  s2r status  # 查看服务状态"
