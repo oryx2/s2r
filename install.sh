@@ -3,9 +3,9 @@ set -euo pipefail
 
 # Remote installer for screen2report.
 # Typical usage:
-#   curl -fsSL https://openclaw.ai/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/oryx2/s2r/main/install.sh | bash
 
-DEFAULT_BASE_URL="https://openclaw.ai/dist"
+DEFAULT_BASE_URL="https://raw.githubusercontent.com/oryx2/s2r/main/dist"
 BASE_URL="${SCREEN2REPORT_BASE_URL:-${DEFAULT_BASE_URL}}"
 VERSION="${SCREEN2REPORT_VERSION:-latest}"
 INSTALL_DIR="${SCREEN2REPORT_INSTALL_DIR:-${HOME}/.screen2report}"

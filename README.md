@@ -13,7 +13,7 @@
 ### 一键安装
 
 ```bash
-curl -fsSL https://openclaw.ai/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/oryx2/s2r/main/install.sh | bash
 ```
 
 安装脚本会自动：
@@ -89,9 +89,9 @@ bash scripts/build_release.sh --version v0.1.0 --bundle-llama-runtime
 - `dist/screen2report-<version>-macos.tar.gz.sha256`
 - `dist/LATEST`
 
-远程安装需托管：
-- 根目录：`install.sh`
-- 发布目录：`dist/` 下的 `.tar.gz`、`.sha256` 和 `LATEST`
+远程安装需托管到 GitHub Releases：
+- `install.sh` → 放到仓库根目录或 GitHub Pages
+- 发布包 → 上传到 GitHub Releases
 
 ## 卸载
 
