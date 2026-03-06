@@ -29,7 +29,7 @@ curl -fsSL https://raw.githubusercontent.com/oryx2/s2r/main/install.sh | bash
 brew install ollama
 
 # 拉取模型
-ollama pull qwen2.5:0.5b
+ollama pull qwen3.5:0.8b
 
 # 启动服务
 ollama serve
@@ -107,8 +107,8 @@ OPENAI_API_STYLE=chat_completions
 OPENAI_USE_JSON_SCHEMA=0
 
 # 模型名称
-OPENAI_MODEL=qwen2.5:0.5b
-OPENAI_REPORT_MODEL=qwen2.5:0.5b
+OPENAI_MODEL=qwen3.5:0.8b
+OPENAI_REPORT_MODEL=qwen3.5:0.8b
 
 # 可选：截图配置
 SCREENSHOT_DISPLAYS=1
