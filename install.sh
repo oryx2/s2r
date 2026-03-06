@@ -9,19 +9,15 @@ OWNER_REPO="${SCREEN2REPORT_OWNER_REPO:-${DEFAULT_OWNER_REPO}}"
 BASE_URL="${SCREEN2REPORT_BASE_URL:-${DEFAULT_BASE_URL}}"
 VERSION="${SCREEN2REPORT_VERSION:-latest}"
 INSTALL_DIR="${SCREEN2REPORT_INSTALL_DIR:-${HOME}/.screen-report}"
-SKIP_MODEL_CHECK=0
-MODEL_REPO_ID="${MODEL_REPO_ID:-Qwen/Qwen3.5-0.8B}"
 
 usage() {
   cat <<'EOF'
-Usage: install-ts.sh [options]
+Usage: install.sh [options]
 
 Options:
   --version <v>         Install specific version (default: latest)
   --base-url <url>      Release files base URL
   --install-dir <path>  Install target directory (default: ~/.screen-report)
-  --skip-model-check    Skip model check and auto-download
-  --model-repo-id <id>  Model repository ID (default: Qwen/Qwen3.5-0.8B)
   -h, --help            Show this help
 EOF
 }
@@ -38,14 +34,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --install-dir)
       INSTALL_DIR="$2"
-      shift 2
-      ;;
-    --skip-model-check)
-      SKIP_MODEL_CHECK=1
-      shift
-      ;;
-    --model-repo-id)
-      MODEL_REPO_ID="$2"
       shift 2
       ;;
     -h|--help)
@@ -158,7 +146,6 @@ fi
 
 # Create necessary directories
 mkdir -p "${INSTALL_DIR}/logs"
-mkdir -p "${INSTALL_DIR}/run"
 
 # Create wrapper script
 BIN_DIR="${INSTALL_DIR}/bin"
@@ -246,42 +233,6 @@ echo "[OK] scheduled tasks installed"
 echo "[INFO]   Capture: every 5 minutes"
 echo "[INFO]   Report:  daily at 18:30"
 
-# Check and download model
-if [[ "${SKIP_MODEL_CHECK}" -eq 0 ]]; then
-  MODELS_DIR="${INSTALL_DIR}/models"
-  REPO_SHORT="${MODEL_REPO_ID##*/}"
-  MODEL_DIR="${MODELS_DIR}/${REPO_SHORT}"
-
-  has_model=0
-  if [[ -d "${MODEL_DIR}" ]]; then
-    gguf_count="$(find "${MODEL_DIR}" -maxdepth 1 -name '*.gguf' 2>/dev/null | wc -l | tr -d ' ')"
-    if [[ "${gguf_count}" -gt 0 ]]; then
-      has_model=1
-    fi
-  fi
-
-  if [[ "${has_model}" -eq 0 ]]; then
-    echo ""
-    echo "============================================"
-    echo "  [WARN] 本地模型未找到"
-    echo "============================================"
-    echo "  模型: ${MODEL_REPO_ID}"
-    echo "  目录: ${MODEL_DIR}"
-    echo ""
-    echo "  请手动下载模型:"
-    echo "  1. 访问 https://modelscope.cn/models/${MODEL_REPO_ID}"
-    echo "  2. 下载 .gguf 文件到 ${MODEL_DIR}/"
-    echo ""
-    echo "  安装完成后运行: s2r start"
-    echo "============================================"
-  else
-    echo "[INFO] 本地模型已存在: ${MODEL_DIR}"
-    echo ""
-    echo "[INFO] 正在启动本地模型服务..."
-    cd "${INSTALL_DIR}" && "${BIN_DIR}/s2r" start
-  fi
-fi
-
 echo ""
 echo "[OK] 安装完成!"
 echo ""
@@ -289,11 +240,14 @@ echo "[INFO] 安装目录: ${INSTALL_DIR}"
 echo "[INFO] 二进制文件: ${BIN_DIR}/s2r"
 echo ""
 echo "使用说明:"
-echo "  s2r start   # 启动模型服务"
-echo "  s2r stop    # 停止模型服务"
-echo "  s2r status  # 查看服务状态"
-echo "  s2r capture # 手动截图分析"
-echo "  s2r report  # 生成日报"
+echo "  s2r status   # 查看配置状态"
+echo "  s2r setup    # 安装定时任务"
+echo "  s2r capture  # 手动截图分析"
+echo "  s2r report   # 生成日报"
+echo ""
+echo "重要: 请先配置 API Key"
+echo "  1. 编辑 ~/.screen-report/.env"
+echo "  2. 设置 OPENAI_API_KEY=your-api-key"
 echo ""
 
 # Ensure install bin is on user's PATH

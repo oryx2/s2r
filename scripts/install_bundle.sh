@@ -17,7 +17,6 @@ fi
 
 # Create necessary directories
 mkdir -p "${BASE_DIR}/logs"
-mkdir -p "${BASE_DIR}/run"
 
 # Install launchd services for scheduled capture and report
 echo "[INFO] installing scheduled tasks..."
@@ -104,4 +103,4 @@ echo "[INFO]   Report:  daily at 18:30"
 
 echo "[OK] setup complete"
 echo "[INFO] binary: ${BASE_DIR}/bin/s2r"
-echo "[INFO] usage: s2r {start|stop|status}"
+echo "[INFO] usage: s2r {status|setup|capture|report|uninstall}"

@@ -1,53 +1,76 @@
-# screen2report (Swift)
+# screen2report
 
-本地模型服务管理工具（macOS）。
+屏幕截图分析日报工具（macOS）- 默认使用 Ollama 本地模型。
 
 ## 功能
 
-- **自动模型管理**：安装时自动检测、下载并启动模型服务
-- **简洁 CLI**：仅三个命令（start / stop / status）
-- **OpenAI 兼容**：提供 http://127.0.0.1:18279/v1 标准接口
+- **截图分析**：定时捕获屏幕并使用 LLM 分析工作内容
+- **日报生成**：基于屏幕活动自动生成工作日报
+- **兼容 Ollama**：默认使用本地 Ollama，无需联网
+- **灵活配置**：支持 OpenAI、OpenRouter 等远程 API
+- **定时任务**：自动截图（每5分钟）和生成日报（每天18:30）
 
 ## 快速开始
 
-### 一键安装
+### 安装
 
 ```bash
+# 一键安装
 curl -fsSL https://raw.githubusercontent.com/oryx2/s2r/main/install.sh | bash
 ```
 
-安装脚本会自动：
-1. 下载并解压应用包
-2. 检查本地模型，如存在则自动启动服务
-3. 如模型不存在，提示手动下载
+### 配置 LLM
+
+默认使用 **Ollama** 本地服务（`http://localhost:11434/v1`）。
+
+确保 Ollama 已安装并运行：
+```bash
+# 安装 Ollama
+brew install ollama
+
+# 拉取模型
+ollama pull qwen2.5:0.5b
+
+# 启动服务
+ollama serve
+```
+
+如需使用其他 API，编辑配置文件：
+```bash
+nano ~/.screen-report/.env
+```
+
+配置示例：
+```bash
+# OpenAI
+OPENAI_API_KEY=your-api-key
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4o-mini
+
+# 或其他兼容 API（OpenRouter、Together AI 等）
+OPENAI_API_KEY=your-key
+OPENAI_BASE_URL=https://openrouter.ai/api/v1
+OPENAI_MODEL=qwen/qwen2.5-vl-72b-instruct:free
+```
 
 ### CLI 命令
 
 ```bash
-# 启动模型服务（后台运行）
-s2r start
-
-# 查看服务状态
+# 查看配置状态
 s2r status
 
-# 停止模型服务
-s2r stop
-```
+# 设置定时任务
+s2r setup
 
-服务启动后，API 地址：`http://127.0.0.1:18279/v1`
+# 手动触发截图分析
+s2r capture
 
-### 使用其他模型
+# 生成日报
+s2r report
+s2r report --date 2024-01-15
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/oryx2/s2r/main/install.sh | bash -s -- --model-repo-id Qwen/Qwen2.5-1.5B
-```
-
-### 跳过模型检查
-
-如果已有模型或想手动管理：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/oryx2/s2r/main/install.sh | bash -s -- --skip-model-check
+# 卸载服务
+s2r uninstall
 ```
 
 ## 目录结构
@@ -56,52 +79,74 @@ curl -fsSL https://raw.githubusercontent.com/oryx2/s2r/main/install.sh | bash -s
 ~/.screen-report/
 ├── bin/
 │   └── s2r              # CLI 二进制
-├── models/
-│   └── Qwen3.5-0.8B/    # 模型文件
-│       └── *.gguf
-├── runtime/
-│   └── llama-server     # llama.cpp 服务端（可选）
-├── logs/
-│   └── model_server.log # 服务日志
-├── run/
-│   └── model_server.pid # 进程 PID
+├── data/
+│   ├── screenshots/     # 截图目录
+│   └── analysis/        # 分析记录
+├── reports/             # 生成的日报
+├── logs/                # 日志文件
 └── .env                 # 环境配置
 ```
 
-## 手动构建
+## 配置说明
+
+`.env` 文件示例：
 
 ```bash
-# 构建 Swift 二进制
-bash scripts/build_swift_binaries.sh
+# API Key（Ollama 默认为 ollama，其他服务需填写真实 key）
+OPENAI_API_KEY=ollama
 
-# 构建发布包
-bash scripts/build_release.sh --version v0.1.0
+# API 基础 URL（默认 Ollama）
+OPENAI_BASE_URL=http://localhost:11434/v1
 
-# 包含 llama-server 运行时
-bash scripts/build_release.sh --version v0.1.0 --bundle-llama-runtime
+# API 风格
+# - chat_completions: 标准 Chat Completions API（Ollama 兼容）
+# - responses: OpenAI Responses API
+OPENAI_API_STYLE=chat_completions
+
+# 是否使用 JSON Schema（Ollama 建议关闭）
+OPENAI_USE_JSON_SCHEMA=0
+
+# 模型名称
+OPENAI_MODEL=qwen2.5:0.5b
+OPENAI_REPORT_MODEL=qwen2.5:0.5b
+
+# 可选：截图配置
+SCREENSHOT_DISPLAYS=1
+SCREENSHOT_MAX_DISPLAYS=6
+SCREENSHOT_REQUEST_PERMISSION=1
 ```
 
-## 打包分发
+## 开发
 
-发布包产物：
+```bash
+# 安装依赖
+npm install
 
-- `dist/screen2report-<version>-macos.tar.gz`
-- `dist/screen2report-<version>-macos.tar.gz.sha256`
-- `dist/LATEST`
+# 构建
+npm run build
 
-远程安装需托管到 GitHub Releases：
-- `install.sh` → 放到仓库根目录或 GitHub Pages
-- 发布包 → 上传到 GitHub Releases
+# 开发模式运行
+npm run dev -- status
+npm run dev -- capture
+npm run dev -- report
+
+# 类型检查
+npm run typecheck
+
+# 代码检查
+npm run lint
+```
 
 ## 卸载
 
 ```bash
-bash scripts/uninstall_launchd.sh
+s2r uninstall
 rm -rf ~/.screen-report
 ```
 
 ## 说明
 
 - 仅支持 macOS
-- 模型默认优先从 ModelScope 下载，失败时回退到 Hugging Face
-- 服务日志：`~/.screen-report/logs/model_server.log`
+- 需要屏幕录制权限
+- 默认使用 Ollama 本地服务，无需联网
+- 支持 OpenAI API 兼容的远程服务

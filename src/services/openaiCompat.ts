@@ -28,7 +28,7 @@ export function resolveBaseURL(): string {
   const base = get('OPENAI_BASE_URL')
     ?? get('OPENBASEURL')
     ?? get('openbaseurl')
-    ?? 'https://api.openai.com/v1';
+    ?? 'http://localhost:11434/v1';
   return base.endsWith('/') ? base.slice(0, -1) : base;
 }
 

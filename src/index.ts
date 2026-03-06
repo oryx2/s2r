@@ -14,7 +14,6 @@ export { captureScreenshots, captureDisplay, hasScreenRecordingPermission, isRun
 export { APIStyle, OpenAIConfig, captureJSONSchema, resolveBaseURL, resolveStyle, shouldUseJSONSchema, makeConfig, callOpenAI, extractText, parseJSONObject } from './services/openaiCompat.js';
 export { runCapture, CaptureOptions } from './services/captureService.js';
 export { generateReport, ReportOptions } from './services/reportService.js';
-export { ServerState, DownloadProgress, healthCheck, downloadWithCurl, downloadGGUF, downloadMultimodalModel, findModelPath, startLlamaServer } from './services/modelService.js';
 export { LaunchdOptions, LaunchdStatus, CAPTURE_LABEL, REPORT_LABEL, isInstalled, install, uninstall } from './services/launchdService.js';
 
 // Type exports
