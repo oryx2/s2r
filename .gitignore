@@ -1,0 +1,16 @@
+data/
+reports/
+logs/
+launchd/
+.env
+models/
+dist/
+.venv/
+.build/
+bin/
+__pycache__/
+*.pyc
+runtime/
+node_modules/
+.DS_Store
+.cursor/

@@ -5,10 +5,10 @@ import { mkdir, access, readFile, unlink, writeFile } from 'fs/promises';
 import { homedir } from 'os';
 import { fileURLToPath } from 'url';
 
-import { runCapture } from './services/captureService.js';
-import { generateReport } from './services/reportService.js';
-import { downloadMultimodalModel, findModelPath, startLlamaServer, healthCheck } from './services/modelService.js';
-import { install as installLaunchd, uninstall as uninstallLaunchd, isInstalled } from './services/launchdService.js';
+import { runCapture } from './services/captureService';
+import { generateReport } from './services/reportService';
+import { downloadMultimodalModel, findModelPath, startLlamaServer, healthCheck } from './services/modelService';
+import { install as installLaunchd, uninstall as uninstallLaunchd, isInstalled } from './services/launchdService';
 
 const program = new Command();
 

@@ -5,10 +5,12 @@ set -euo pipefail
 # Typical usage:
 #   curl -fsSL https://raw.githubusercontent.com/oryx2/s2r/main/install.sh | bash
 
-DEFAULT_BASE_URL="https://raw.githubusercontent.com/oryx2/s2r/main/dist"
+DEFAULT_OWNER_REPO="oryx2/s2r"
+DEFAULT_BASE_URL="https://github.com/${DEFAULT_OWNER_REPO}/releases/download"
+OWNER_REPO="${SCREEN2REPORT_OWNER_REPO:-${DEFAULT_OWNER_REPO}}"
 BASE_URL="${SCREEN2REPORT_BASE_URL:-${DEFAULT_BASE_URL}}"
 VERSION="${SCREEN2REPORT_VERSION:-latest}"
-INSTALL_DIR="${SCREEN2REPORT_INSTALL_DIR:-${HOME}/.screen2report}"
+INSTALL_DIR="${SCREEN2REPORT_INSTALL_DIR:-${HOME}/.screen-report}"
 SKIP_AUTOINSTALL=0
 SKIP_MODEL_CHECK=0
 MODEL_REPO_ID="${MODEL_REPO_ID:-Qwen/Qwen3.5-0.8B}"
@@ -19,11 +21,12 @@ Usage: install.sh [options]
 
 Options:
   --version <v>         Install specific version (default: latest)
-  --base-url <url>      Release files base URL (default: https://openclaw.ai/dist)
-  --install-dir <path>  Install target directory (default: ~/.screen2report)
+  --base-url <url>      Release files base URL (default: https://github.com/oryx2/s2r/releases/download)
+  --install-dir <path>  Install target directory (default: ~/.screen-report)
   --skip-autoinstall    Do not run post-install setup
   --skip-model-check    Skip model check and auto-download
   --model-repo-id <id>  Model repository ID (default: Qwen/Qwen3.5-0.8B)
+  --owner-repo <repo>   GitHub owner/repo for releases (default: oryx2/s2r)
   -h, --help            Show this help
 
 Environment overrides:
@@ -41,6 +44,13 @@ while [[ $# -gt 0 ]]; do
       ;;
     --base-url)
       BASE_URL="$2"
+      shift 2
+      ;;
+    --owner-repo)
+      OWNER_REPO="$2"
+      # if user sets owner/repo, adjust BASE_URL default
+      DEFAULT_BASE_URL="https://github.com/${OWNER_REPO}/releases/download"
+      BASE_URL="${SCREEN2REPORT_BASE_URL:-${DEFAULT_BASE_URL}}"
       shift 2
       ;;
     --install-dir)
@@ -84,18 +94,20 @@ for cmd in curl tar shasum awk mktemp rsync; do
 done
 
 if [[ "${VERSION}" == "latest" ]]; then
-  latest_url="${BASE_URL%/}/LATEST"
-  echo "[INFO] resolving latest version from ${latest_url}"
-  VERSION="$(curl -fsSL "${latest_url}" | tr -d '\r' | awk 'NF{print $1; exit}')"
+  echo "[INFO] resolving latest release tag for ${OWNER_REPO} via GitHub API"
+  api_url="https://api.github.com/repos/${OWNER_REPO}/releases/latest"
+  VERSION="$(curl -fsSL "${api_url}" | awk -F '"' '/"tag_name":/ {print $4; exit}')"
   if [[ -z "${VERSION}" ]]; then
-    echo "[ERROR] failed to resolve latest version from ${latest_url}" >&2
+    echo "[ERROR] failed to resolve latest release tag from ${api_url}" >&2
     exit 1
   fi
+  echo "[INFO] latest release tag: ${VERSION}"
 fi
 
 PKG_NAME="screen2report-${VERSION}-macos"
 ARCHIVE_NAME="${PKG_NAME}.tar.gz"
-ARCHIVE_URL="${BASE_URL%/}/${ARCHIVE_NAME}"
+# GitHub releases download URL: /releases/download/<tag>/<asset>
+ARCHIVE_URL="${BASE_URL%/}/${VERSION}/${ARCHIVE_NAME}"
 SHA_URL="${ARCHIVE_URL}.sha256"
 
 TMP_DIR="$(mktemp -d)"
@@ -174,8 +186,45 @@ if [[ "${SKIP_MODEL_CHECK}" -eq 0 ]]; then
     echo "  1. 访问 https://modelscope.cn/models/${MODEL_REPO_ID}"
     echo "  2. 下载 .gguf 文件到 ${MODEL_DIR}/"
     echo ""
-    echo "  或使用 Hugging Face:"
-    echo "  huggingface-cli download ${MODEL_REPO_ID} --local-dir ${MODEL_DIR}"
+    echo "  推荐使用 ModelScope 下载模型（优先）： https://modelscope.cn/models/${MODEL_REPO_ID}"
+    echo "  或使用 Hugging Face CLI: huggingface-cli download ${MODEL_REPO_ID} --local-dir ${MODEL_DIR}"
+    echo ""
+    # Prompt user to download automatically, prefer ModelScope
+    echo "Choose download option:" 
+    echo "  m) Open ModelScope page (recommended)"
+    echo "  h) Use Hugging Face CLI (if installed)"
+    echo "  s) Skip"
+    read -p "Your choice [m/h/s]: " choice
+    choice=${choice:-m}
+    if [[ "$choice" == "m" ]]; then
+      echo "[INFO] Opening ModelScope page: https://modelscope.cn/models/${MODEL_REPO_ID}"
+      if command -v open >/dev/null 2>&1; then
+        open "https://modelscope.cn/models/${MODEL_REPO_ID}"
+      else
+        echo "Please visit: https://modelscope.cn/models/${MODEL_REPO_ID}" >&2
+      fi
+      echo "Please download the .gguf file into: ${MODEL_DIR}/ then re-run this installer or place files and run 's2r start'."
+    elif [[ "$choice" == "h" ]]; then
+      mkdir -p "${MODEL_DIR}"
+      if command -v huggingface-cli >/dev/null 2>&1; then
+        echo "[INFO] running: huggingface-cli download ${MODEL_REPO_ID} --local-dir ${MODEL_DIR}"
+        if huggingface-cli download "${MODEL_REPO_ID}" --local-dir "${MODEL_DIR}"; then
+          echo "[OK] model download completed"
+        else
+          echo "[ERROR] huggingface-cli failed to download model" >&2
+        fi
+      else
+        echo "[WARN] huggingface-cli not found. Install with: pip install huggingface_hub" >&2
+        echo "Or choose the ModelScope option to download manually." >&2
+      fi
+      # re-check for .gguf files
+      gguf_count=$(find "${MODEL_DIR}" -maxdepth 1 -name '*.gguf' 2>/dev/null | wc -l | tr -d ' ')
+      if [[ "${gguf_count}" -gt 0 ]]; then
+        has_model=1
+      fi
+    else
+      echo "[INFO] skipped automatic model download by user request"
+    fi
     echo "============================================"
     echo ""
     echo "[INFO] 安装完成，但模型需要手动下载"
@@ -186,6 +235,9 @@ if [[ "${SKIP_MODEL_CHECK}" -eq 0 ]]; then
     echo ""
     echo "[INFO] 正在启动本地模型服务..."
     cd "${INSTALL_DIR}" && "${INSTALL_DIR}/bin/s2r" start
+
+    # Note: launchd scheduled tasks are already installed by install_bundle.sh
+    # s2r start will also auto-install them if needed
   fi
 fi
 
@@ -199,3 +251,30 @@ echo "使用说明:"
 echo "  s2r start   # 启动模型服务"
 echo "  s2r stop    # 停止模型服务"
 echo "  s2r status  # 查看服务状态"
+
+# Ensure install bin is on user's PATH by adding to profile if missing
+USER_BIN_PATH="${INSTALL_DIR}/bin"
+add_path_to_profile() {
+  shell_name="$(basename "${SHELL:-/bin/bash}")"
+  if [[ "${shell_name}" == "zsh" ]]; then
+    profile_file="${HOME}/.zprofile"
+  else
+    profile_file="${HOME}/.bash_profile"
+  fi
+
+  if ! grep -F "${USER_BIN_PATH}" "${profile_file}" >/dev/null 2>&1; then
+    echo "[INFO] adding ${USER_BIN_PATH} to PATH in ${profile_file}"
+    mkdir -p "$(dirname "${profile_file}")"
+    cat >> "${profile_file}" <<EOF
+# Added by screen2report installer
+if [ -d "${USER_BIN_PATH}" ]; then
+  export PATH="${USER_BIN_PATH}:\$PATH"
+fi
+EOF
+    echo "[OK] updated ${profile_file}. Restart your shell or run: source ${profile_file}"
+  else
+    echo "[INFO] ${USER_BIN_PATH} already on PATH in ${profile_file}"
+  fi
+}
+
+add_path_to_profile

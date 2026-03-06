@@ -1,0 +1,104 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:selfrecord}",
+            "name": "Debug s2r-capture",
+            "target": "s2r-capture",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug s2r-capture"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:selfrecord}",
+            "name": "Release s2r-capture",
+            "target": "s2r-capture",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release s2r-capture"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:selfrecord}",
+            "name": "Debug s2r-report",
+            "target": "s2r-report",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug s2r-report"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:selfrecord}",
+            "name": "Release s2r-report",
+            "target": "s2r-report",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release s2r-report"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:selfrecord}",
+            "name": "Debug s2r-model",
+            "target": "s2r-model",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug s2r-model"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:selfrecord}",
+            "name": "Release s2r-model",
+            "target": "s2r-model",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release s2r-model"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:selfrecord}",
+            "name": "Debug s2r-ui",
+            "target": "s2r-ui",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug s2r-ui"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:selfrecord}",
+            "name": "Release s2r-ui",
+            "target": "s2r-ui",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release s2r-ui"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:selfrecord}",
+            "name": "Debug s2r",
+            "target": "s2r",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug s2r"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:selfrecord}",
+            "name": "Release s2r",
+            "target": "s2r",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release s2r"
+        }
+    ]
+}
