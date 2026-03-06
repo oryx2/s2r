@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Remote installer for screen2report.
-# Typical usage:
-#   curl -fsSL https://raw.githubusercontent.com/oryx2/s2r/main/install.sh | bash
+# Remote installer for screen2report TypeScript version.
 
 DEFAULT_OWNER_REPO="oryx2/s2r"
 DEFAULT_BASE_URL="https://github.com/${DEFAULT_OWNER_REPO}/releases/download"
@@ -11,28 +9,20 @@ OWNER_REPO="${SCREEN2REPORT_OWNER_REPO:-${DEFAULT_OWNER_REPO}}"
 BASE_URL="${SCREEN2REPORT_BASE_URL:-${DEFAULT_BASE_URL}}"
 VERSION="${SCREEN2REPORT_VERSION:-latest}"
 INSTALL_DIR="${SCREEN2REPORT_INSTALL_DIR:-${HOME}/.screen-report}"
-SKIP_AUTOINSTALL=0
 SKIP_MODEL_CHECK=0
 MODEL_REPO_ID="${MODEL_REPO_ID:-Qwen/Qwen3.5-0.8B}"
 
 usage() {
   cat <<'EOF'
-Usage: install.sh [options]
+Usage: install-ts.sh [options]
 
 Options:
   --version <v>         Install specific version (default: latest)
-  --base-url <url>      Release files base URL (default: https://github.com/oryx2/s2r/releases/download)
+  --base-url <url>      Release files base URL
   --install-dir <path>  Install target directory (default: ~/.screen-report)
-  --skip-autoinstall    Do not run post-install setup
   --skip-model-check    Skip model check and auto-download
   --model-repo-id <id>  Model repository ID (default: Qwen/Qwen3.5-0.8B)
-  --owner-repo <repo>   GitHub owner/repo for releases (default: oryx2/s2r)
   -h, --help            Show this help
-
-Environment overrides:
-  SCREEN2REPORT_BASE_URL
-  SCREEN2REPORT_VERSION
-  SCREEN2REPORT_INSTALL_DIR
 EOF
 }
 
@@ -46,20 +36,9 @@ while [[ $# -gt 0 ]]; do
       BASE_URL="$2"
       shift 2
       ;;
-    --owner-repo)
-      OWNER_REPO="$2"
-      # if user sets owner/repo, adjust BASE_URL default
-      DEFAULT_BASE_URL="https://github.com/${OWNER_REPO}/releases/download"
-      BASE_URL="${SCREEN2REPORT_BASE_URL:-${DEFAULT_BASE_URL}}"
-      shift 2
-      ;;
     --install-dir)
       INSTALL_DIR="$2"
       shift 2
-      ;;
-    --skip-autoinstall)
-      SKIP_AUTOINSTALL=1
-      shift
       ;;
     --skip-model-check)
       SKIP_MODEL_CHECK=1
@@ -86,6 +65,22 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 1
 fi
 
+# Check for Node.js
+if ! command -v node >/dev/null 2>&1; then
+  echo "[ERROR] Node.js not found. Please install Node.js 18+ first." >&2
+  echo "  brew install node" >&2
+  exit 1
+fi
+
+NODE_VERSION=$(node --version | sed 's/v//')
+REQUIRED_VERSION="18.0.0"
+if [[ "$(printf '%s\n' "$REQUIRED_VERSION" "$NODE_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]]; then
+  echo "[ERROR] Node.js version $NODE_VERSION is too old. Required: $REQUIRED_VERSION+" >&2
+  exit 1
+fi
+
+echo "[INFO] Node.js version: $NODE_VERSION"
+
 for cmd in curl tar shasum awk mktemp rsync; do
   if ! command -v "${cmd}" >/dev/null 2>&1; then
     echo "[ERROR] missing required command: ${cmd}" >&2
@@ -104,9 +99,8 @@ if [[ "${VERSION}" == "latest" ]]; then
   echo "[INFO] latest release tag: ${VERSION}"
 fi
 
-PKG_NAME="screen2report-${VERSION}-macos"
+PKG_NAME="screen2report-ts-${VERSION}-macos"
 ARCHIVE_NAME="${PKG_NAME}.tar.gz"
-# GitHub releases download URL: /releases/download/<tag>/<asset>
 ARCHIVE_URL="${BASE_URL%/}/${VERSION}/${ARCHIVE_NAME}"
 SHA_URL="${ARCHIVE_URL}.sha256"
 
@@ -149,18 +143,110 @@ mkdir -p "${INSTALL_DIR}"
 rsync -a --delete "${SRC_DIR}/" "${INSTALL_DIR}/"
 echo "[OK] installed to: ${INSTALL_DIR}"
 
-if [[ "${SKIP_AUTOINSTALL}" -eq 1 ]]; then
-  echo "[INFO] skipped install_bundle.sh by request"
-  exit 0
+# Install Node.js dependencies
+echo "[INFO] installing Node.js dependencies..."
+cd "${INSTALL_DIR}"
+npm install --production
+
+# Create .env if not exists
+if [[ ! -f "${INSTALL_DIR}/.env" ]]; then
+  if [[ -f "${INSTALL_DIR}/.env.example" ]]; then
+    cp "${INSTALL_DIR}/.env.example" "${INSTALL_DIR}/.env"
+    echo "[INFO] created .env from .env.example"
+  fi
 fi
 
-echo "[INFO] running post-install setup..."
-(
-  cd "${INSTALL_DIR}"
-  bash scripts/install_bundle.sh
-)
+# Create necessary directories
+mkdir -p "${INSTALL_DIR}/logs"
+mkdir -p "${INSTALL_DIR}/run"
 
-# --- 检查并下载模型 ---
+# Create wrapper script
+BIN_DIR="${INSTALL_DIR}/bin"
+mkdir -p "${BIN_DIR}"
+cat > "${BIN_DIR}/s2r" <<EOF
+#!/bin/bash
+exec node "${INSTALL_DIR}/dist/cli.js" "\$@"
+EOF
+chmod +x "${BIN_DIR}/s2r"
+
+# Install launchd services
+echo "[INFO] installing scheduled tasks..."
+LAUNCHD_DIR="${HOME}/Library/LaunchAgents"
+mkdir -p "${LAUNCHD_DIR}"
+
+CAPTURE_LABEL="com.screen2report.capture"
+REPORT_LABEL="com.screen2report.report"
+
+cat > "${LAUNCHD_DIR}/${CAPTURE_LABEL}.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>${CAPTURE_LABEL}</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>${BIN_DIR}/s2r</string>
+      <string>capture</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>300</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>WorkingDirectory</key>
+    <string>${INSTALL_DIR}</string>
+    <key>StandardOutPath</key>
+    <string>${INSTALL_DIR}/logs/capture.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>${INSTALL_DIR}/logs/capture.err.log</string>
+  </dict>
+</plist>
+EOF
+
+cat > "${LAUNCHD_DIR}/${REPORT_LABEL}.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>${REPORT_LABEL}</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>${BIN_DIR}/s2r</string>
+      <string>report</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+      <key>Hour</key>
+      <integer>18</integer>
+      <key>Minute</key>
+      <integer>30</integer>
+    </dict>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>WorkingDirectory</key>
+    <string>${INSTALL_DIR}</string>
+    <key>StandardOutPath</key>
+    <string>${INSTALL_DIR}/logs/report.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>${INSTALL_DIR}/logs/report.err.log</string>
+  </dict>
+</plist>
+EOF
+
+# Load services
+launchctl bootout "gui/$(id -u)/${CAPTURE_LABEL}" 2>/dev/null || true
+launchctl bootout "gui/$(id -u)/${REPORT_LABEL}" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "${LAUNCHD_DIR}/${CAPTURE_LABEL}.plist"
+launchctl bootstrap "gui/$(id -u)" "${LAUNCHD_DIR}/${REPORT_LABEL}.plist"
+launchctl enable "gui/$(id -u)/${CAPTURE_LABEL}"
+launchctl enable "gui/$(id -u)/${REPORT_LABEL}"
+
+echo "[OK] scheduled tasks installed"
+echo "[INFO]   Capture: every 5 minutes"
+echo "[INFO]   Report:  daily at 18:30"
+
+# Check and download model
 if [[ "${SKIP_MODEL_CHECK}" -eq 0 ]]; then
   MODELS_DIR="${INSTALL_DIR}/models"
   REPO_SHORT="${MODEL_REPO_ID##*/}"
@@ -186,58 +272,13 @@ if [[ "${SKIP_MODEL_CHECK}" -eq 0 ]]; then
     echo "  1. 访问 https://modelscope.cn/models/${MODEL_REPO_ID}"
     echo "  2. 下载 .gguf 文件到 ${MODEL_DIR}/"
     echo ""
-    echo "  推荐使用 ModelScope 下载模型（优先）： https://modelscope.cn/models/${MODEL_REPO_ID}"
-    echo "  或使用 Hugging Face CLI: huggingface-cli download ${MODEL_REPO_ID} --local-dir ${MODEL_DIR}"
-    echo ""
-    # Prompt user to download automatically, prefer ModelScope
-    echo "Choose download option:" 
-    echo "  m) Open ModelScope page (recommended)"
-    echo "  h) Use Hugging Face CLI (if installed)"
-    echo "  s) Skip"
-    read -p "Your choice [m/h/s]: " choice
-    choice=${choice:-m}
-    if [[ "$choice" == "m" ]]; then
-      echo "[INFO] Opening ModelScope page: https://modelscope.cn/models/${MODEL_REPO_ID}"
-      if command -v open >/dev/null 2>&1; then
-        open "https://modelscope.cn/models/${MODEL_REPO_ID}"
-      else
-        echo "Please visit: https://modelscope.cn/models/${MODEL_REPO_ID}" >&2
-      fi
-      echo "Please download the .gguf file into: ${MODEL_DIR}/ then re-run this installer or place files and run 's2r start'."
-    elif [[ "$choice" == "h" ]]; then
-      mkdir -p "${MODEL_DIR}"
-      if command -v huggingface-cli >/dev/null 2>&1; then
-        echo "[INFO] running: huggingface-cli download ${MODEL_REPO_ID} --local-dir ${MODEL_DIR}"
-        if huggingface-cli download "${MODEL_REPO_ID}" --local-dir "${MODEL_DIR}"; then
-          echo "[OK] model download completed"
-        else
-          echo "[ERROR] huggingface-cli failed to download model" >&2
-        fi
-      else
-        echo "[WARN] huggingface-cli not found. Install with: pip install huggingface_hub" >&2
-        echo "Or choose the ModelScope option to download manually." >&2
-      fi
-      # re-check for .gguf files
-      gguf_count=$(find "${MODEL_DIR}" -maxdepth 1 -name '*.gguf' 2>/dev/null | wc -l | tr -d ' ')
-      if [[ "${gguf_count}" -gt 0 ]]; then
-        has_model=1
-      fi
-    else
-      echo "[INFO] skipped automatic model download by user request"
-    fi
+    echo "  安装完成后运行: s2r start"
     echo "============================================"
-    echo ""
-    echo "[INFO] 安装完成，但模型需要手动下载"
   else
     echo "[INFO] 本地模型已存在: ${MODEL_DIR}"
-
-    # --- 启动模型服务 ---
     echo ""
     echo "[INFO] 正在启动本地模型服务..."
-    cd "${INSTALL_DIR}" && "${INSTALL_DIR}/bin/s2r" start
-
-    # Note: launchd scheduled tasks are already installed by install_bundle.sh
-    # s2r start will also auto-install them if needed
+    cd "${INSTALL_DIR}" && "${BIN_DIR}/s2r" start
   fi
 fi
 
@@ -245,15 +286,18 @@ echo ""
 echo "[OK] 安装完成!"
 echo ""
 echo "[INFO] 安装目录: ${INSTALL_DIR}"
-echo "[INFO] 二进制文件: ${INSTALL_DIR}/bin/s2r"
+echo "[INFO] 二进制文件: ${BIN_DIR}/s2r"
 echo ""
 echo "使用说明:"
 echo "  s2r start   # 启动模型服务"
 echo "  s2r stop    # 停止模型服务"
 echo "  s2r status  # 查看服务状态"
+echo "  s2r capture # 手动截图分析"
+echo "  s2r report  # 生成日报"
+echo ""
 
-# Ensure install bin is on user's PATH by adding to profile if missing
-USER_BIN_PATH="${INSTALL_DIR}/bin"
+# Ensure install bin is on user's PATH
+USER_BIN_PATH="${BIN_DIR}"
 add_path_to_profile() {
   shell_name="$(basename "${SHELL:-/bin/bash}")"
   if [[ "${shell_name}" == "zsh" ]]; then
