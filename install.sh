@@ -150,9 +150,10 @@ mkdir -p "${INSTALL_DIR}/logs"
 # Create wrapper script
 BIN_DIR="${INSTALL_DIR}/bin"
 mkdir -p "${BIN_DIR}"
+NODE_PATH="$(command -v node)"
 cat > "${BIN_DIR}/s2r" <<EOF
 #!/bin/bash
-exec node "${INSTALL_DIR}/dist/cli.js" "\$@"
+exec ${NODE_PATH} "${INSTALL_DIR}/dist/cli.js" "\$@"
 EOF
 chmod +x "${BIN_DIR}/s2r"
 
