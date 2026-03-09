@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Remote installer for screen2report TypeScript version.
+# Remote installer for screen2report binary version.
 
 DEFAULT_OWNER_REPO="oryx2/s2r"
 DEFAULT_BASE_URL="https://github.com/${DEFAULT_OWNER_REPO}/releases/download"
@@ -53,22 +53,6 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 1
 fi
 
-# Check for Node.js
-if ! command -v node >/dev/null 2>&1; then
-  echo "[ERROR] Node.js not found. Please install Node.js 18+ first." >&2
-  echo "  brew install node" >&2
-  exit 1
-fi
-
-NODE_VERSION=$(node --version | sed 's/v//')
-REQUIRED_VERSION="18.0.0"
-if [[ "$(printf '%s\n' "$REQUIRED_VERSION" "$NODE_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]]; then
-  echo "[ERROR] Node.js version $NODE_VERSION is too old. Required: $REQUIRED_VERSION+" >&2
-  exit 1
-fi
-
-echo "[INFO] Node.js version: $NODE_VERSION"
-
 for cmd in curl tar shasum awk mktemp rsync; do
   if ! command -v "${cmd}" >/dev/null 2>&1; then
     echo "[ERROR] missing required command: ${cmd}" >&2
@@ -87,7 +71,7 @@ if [[ "${VERSION}" == "latest" ]]; then
   echo "[INFO] latest release tag: ${VERSION}"
 fi
 
-PKG_NAME="screen2report-ts-${VERSION}-macos"
+PKG_NAME="screen2report-${VERSION}-macos"
 ARCHIVE_NAME="${PKG_NAME}.tar.gz"
 ARCHIVE_URL="${BASE_URL%/}/${VERSION}/${ARCHIVE_NAME}"
 SHA_URL="${ARCHIVE_URL}.sha256"
@@ -131,11 +115,6 @@ mkdir -p "${INSTALL_DIR}"
 rsync -a --delete "${SRC_DIR}/" "${INSTALL_DIR}/"
 echo "[OK] installed to: ${INSTALL_DIR}"
 
-# Install Node.js dependencies
-echo "[INFO] installing Node.js dependencies..."
-cd "${INSTALL_DIR}"
-npm install --production
-
 # Create .env if not exists
 if [[ ! -f "${INSTALL_DIR}/.env" ]]; then
   if [[ -f "${INSTALL_DIR}/.env.example" ]]; then
@@ -144,18 +123,11 @@ if [[ ! -f "${INSTALL_DIR}/.env" ]]; then
   fi
 fi
 
-# Create necessary directories
-mkdir -p "${INSTALL_DIR}/logs"
-
-# Create wrapper script
-BIN_DIR="${INSTALL_DIR}/bin"
-mkdir -p "${BIN_DIR}"
-NODE_PATH="$(command -v node)"
-cat > "${BIN_DIR}/s2r" <<EOF
-#!/bin/bash
-exec ${NODE_PATH} "${INSTALL_DIR}/dist/cli.js" "\$@"
-EOF
-chmod +x "${BIN_DIR}/s2r"
+# Ensure binary is executable
+BIN_PATH="${INSTALL_DIR}/bin/s2r"
+if [[ -f "${BIN_PATH}" ]]; then
+  chmod +x "${BIN_PATH}"
+fi
 
 # Install launchd services
 echo "[INFO] installing scheduled tasks..."
@@ -174,7 +146,7 @@ cat > "${LAUNCHD_DIR}/${CAPTURE_LABEL}.plist" <<EOF
     <string>${CAPTURE_LABEL}</string>
     <key>ProgramArguments</key>
     <array>
-      <string>${BIN_DIR}/s2r</string>
+      <string>${BIN_PATH}</string>
       <string>capture</string>
     </array>
     <key>StartInterval</key>
@@ -200,7 +172,7 @@ cat > "${LAUNCHD_DIR}/${REPORT_LABEL}.plist" <<EOF
     <string>${REPORT_LABEL}</string>
     <key>ProgramArguments</key>
     <array>
-      <string>${BIN_DIR}/s2r</string>
+      <string>${BIN_PATH}</string>
       <string>report</string>
     </array>
     <key>StartCalendarInterval</key>
@@ -238,7 +210,7 @@ echo ""
 echo "[OK] 安装完成!"
 echo ""
 echo "[INFO] 安装目录: ${INSTALL_DIR}"
-echo "[INFO] 二进制文件: ${BIN_DIR}/s2r"
+echo "[INFO] 二进制文件: ${BIN_PATH}"
 echo ""
 echo "使用说明:"
 echo "  s2r status   # 查看配置状态"
@@ -252,7 +224,7 @@ echo "  2. 设置 OPENAI_API_KEY=your-api-key"
 echo ""
 
 # Ensure install bin is on user's PATH
-USER_BIN_PATH="${BIN_DIR}"
+USER_BIN_PATH="${INSTALL_DIR}/bin"
 add_path_to_profile() {
   shell_name="$(basename "${SHELL:-/bin/bash}")"
   if [[ "${shell_name}" == "zsh" ]]; then
