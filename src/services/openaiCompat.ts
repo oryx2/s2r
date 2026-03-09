@@ -131,6 +131,12 @@ export function extractText(response: Record<string, unknown>): string {
           .filter((t): t is string => typeof t === 'string' && t.length > 0);
         if (parts.length > 0) return parts.join('\n');
       }
+
+      // Handle reasoning field (thinking models like qwen3.5)
+      const reasoning = (message as Record<string, unknown>).reasoning;
+      if (typeof reasoning === 'string' && reasoning.trim()) {
+        return reasoning;
+      }
     }
   }
 
