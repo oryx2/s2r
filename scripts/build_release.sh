@@ -24,12 +24,25 @@ BUILD_DIR="${DIST_DIR}/build"
 
 echo "[INFO] Building release package for ${VERSION}"
 
+# Check for bun
+if ! command -v bun >/dev/null 2>&1; then
+  if [[ -x "$HOME/.bun/bin/bun" ]]; then
+    export PATH="$HOME/.bun/bin:$PATH"
+  else
+    echo "[ERROR] bun not found. Please install bun first." >&2
+    echo "  curl -fsSL https://bun.sh/install | bash" >&2
+    exit 1
+  fi
+fi
+
+echo "[INFO] Using bun: $(bun --version)"
+
 # Clean and create build directory
 rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}"
 
 # Create package directory
-PKG_NAME="screen2report-ts-${VERSION}-macos"
+PKG_NAME="screen2report-${VERSION}-macos"
 PKG_DIR="${BUILD_DIR}/${PKG_NAME}"
 mkdir -p "${PKG_DIR}"
 
@@ -38,10 +51,18 @@ echo "[INFO] Building TypeScript..."
 cd "${PROJECT_DIR}"
 npm run build
 
-# Copy files
+# Build binary with bun
+echo "[INFO] Building binary with bun..."
+bun build dist/cli.js --compile --outfile "${PKG_DIR}/bin/s2r"
+chmod +x "${PKG_DIR}/bin/s2r"
+
+# Copy necessary files
 echo "[INFO] Copying files..."
-rsync -av --exclude='.git' --exclude='node_modules' \
-  "${PROJECT_DIR}/" "${PKG_DIR}/"
+mkdir -p "${PKG_DIR}/data/screenshots"
+mkdir -p "${PKG_DIR}/data/analysis"
+mkdir -p "${PKG_DIR}/reports"
+mkdir -p "${PKG_DIR}/logs"
+cp .env.example "${PKG_DIR}/"
 
 # Create tarball
 echo "[INFO] Creating tarball..."
@@ -62,3 +83,5 @@ rm -rf "${BUILD_DIR}"
 echo "[OK] Release package created:"
 echo "  ${DIST_DIR}/${PKG_NAME}.tar.gz"
 echo "  ${DIST_DIR}/${PKG_NAME}.tar.gz.sha256"
+echo ""
+echo "Binary size: $(du -h ${DIST_DIR}/${PKG_NAME}.tar.gz | cut -f1)"

@@ -11,7 +11,9 @@
     "dev": "ts-node src/cli.ts",
     "start": "node dist/cli.js",
     "lint": "eslint src/**/*.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "pkg": "pkg dist/cli.js --targets node18-macos-arm64 --output dist/s2r",
+    "pkg:x64": "pkg dist/cli.js --targets node18-macos-x64 --output dist/s2r"
   },
   "keywords": ["screen-capture", "llm", "report", "macos"],
   "author": "",
