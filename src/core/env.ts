@@ -28,6 +28,14 @@ export function getOrDefault(name: string, defaultValue: string): string {
   return process.env[name] ?? defaultValue;
 }
 
+export function int(name: string, defaultValue: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) return defaultValue;
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultValue;
+}
+
 export function bool(name: string, defaultValue: boolean): boolean {
   const raw = process.env[name]?.trim().toLowerCase();
   if (!raw) return defaultValue;

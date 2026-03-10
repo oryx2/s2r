@@ -1,6 +1,6 @@
 {
   "name": "screen2report",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "本地模型服务管理工具（macOS）- TypeScript 重构版本",
   "main": "dist/index.js",
   "bin": {

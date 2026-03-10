@@ -20,7 +20,7 @@ export async function generateReport(options: ReportOptions): Promise<ReportResu
   // Load environment
   await load(new URL('.env', baseDir));
 
-  const targetDate = dateString ?? new Date().toISOString().split('T')[0];
+  const targetDate = dateString ?? formatLocalDate(new Date());
 
   onProgress?.(`Reading analysis records for ${targetDate}...`);
   const analysisFile = new URL(`data/analysis/${targetDate}.jsonl`, baseDir);
@@ -68,4 +68,11 @@ export async function generateReport(options: ReportOptions): Promise<ReportResu
     content: reportText,
     recordCount: records.length,
   };
+}
+
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }

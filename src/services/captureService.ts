@@ -3,10 +3,16 @@ import { fileURLToPath } from 'url';
 import { readFile } from 'fs/promises';
 import type { AnalysisRecord, CaptureResult } from '../types/index.js';
 import { ensureCaptureDirs, appendJSONL } from '../utils/fileStore.js';
-import { captureScreenshots } from '../utils/screenshot.js';
+import {
+  buildPermissionHelpMessage,
+  captureScreenshots,
+  hasScreenRecordingPermission,
+  isRunningUnderLaunchd,
+  requestScreenRecordingPermission,
+} from '../utils/screenshot.js';
 import { buildPayload, parseAnalysis } from '../core/captureLogic.js';
 import { makeConfig, callOpenAI, extractText } from './openaiCompat.js';
-import { get } from '../core/env.js';
+import { bool, get } from '../core/env.js';
 import { load } from '../core/dotenv.js';
 
 export interface CaptureOptions {
@@ -23,11 +29,14 @@ export async function runCapture(options: CaptureOptions): Promise<CaptureResult
   await load(new URL('.env', baseDir));
 
   const now = new Date();
-  const dateString = now.toISOString().split('T')[0];
+  const dateString = formatLocalDate(now);
   const timeString = now.toTimeString().slice(0, 8).replace(/:/g, '');
+  const runningInBackground = isRunningUnderLaunchd();
 
   onProgress?.('Creating directories...');
   const dirs = await ensureCaptureDirs(baseDir, dateString);
+
+  ensureScreenRecordingPermission(runningInBackground, onProgress);
 
   onProgress?.('Capturing screenshots...');
   const screenshotPaths = await captureScreenshots(dirs.screenshots, timeString);
@@ -109,4 +118,44 @@ export async function runCapture(options: CaptureOptions): Promise<CaptureResult
     analysisFile: analysisFile.pathname,
     record,
   };
+}
+
+function ensureScreenRecordingPermission(
+  runningInBackground: boolean,
+  onProgress?: (message: string) => void
+): void {
+  const permission = hasScreenRecordingPermission();
+  if (permission === true) {
+    return;
+  }
+
+  if (permission === false) {
+    const shouldRequest = bool('SCREENSHOT_REQUEST_PERMISSION', true);
+    if (shouldRequest && !runningInBackground) {
+      onProgress?.('Screen recording permission missing, requesting access...');
+      requestScreenRecordingPermission();
+
+      if (hasScreenRecordingPermission() === true) {
+        onProgress?.('Screen recording permission granted');
+        return;
+      }
+
+      throw new Error(
+        `${buildPermissionHelpMessage(false)} 如果刚刚点了允许，请完全退出并重新打开当前终端/应用后再运行一次。`
+      );
+    }
+
+    throw new Error(buildPermissionHelpMessage(runningInBackground));
+  }
+
+  if (bool('SCREENSHOT_STRICT_PERMISSION', false)) {
+    throw new Error('Unable to verify screen recording permission on this machine.');
+  }
+}
+
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }

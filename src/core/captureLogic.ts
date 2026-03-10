@@ -1,4 +1,5 @@
 import { captureJSONSchema, type APIStyle, parseJSONObject } from '../services/openaiCompat.js';
+import { int } from './env.js';
 import type { AnalysisResult } from '../types/index.js';
 
 export const SYSTEM_PROMPT =
@@ -14,6 +15,8 @@ export const USER_PROMPT =
   "confidence": 0.0
 }
 只输出 JSON，不要使用 markdown 代码块。`;
+
+const CAPTURE_MAX_OUTPUT_TOKENS = int('OPENAI_CAPTURE_MAX_OUTPUT_TOKENS', 1200);
 
 export function buildPayload(
   model: string,
@@ -33,7 +36,7 @@ export function buildPayload(
         { role: 'system', content: [{ type: 'input_text', text: SYSTEM_PROMPT }] },
         { role: 'user', content: userContent },
       ],
-      max_output_tokens: 400,
+      max_output_tokens: CAPTURE_MAX_OUTPUT_TOKENS,
     };
 
     if (useJSONSchema) {
@@ -62,7 +65,7 @@ export function buildPayload(
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userContent },
     ],
-    max_tokens: 400,
+    max_tokens: CAPTURE_MAX_OUTPUT_TOKENS,
   };
 
   if (useJSONSchema) {

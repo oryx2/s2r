@@ -1,18 +1,33 @@
+import { spawnSync } from 'child_process';
 import { URL } from 'url';
 import { fileURLToPath } from 'url';
 import { run } from './shell.js';
 import { get } from '../core/env.js';
 
-// macOS-specific screen recording permission check
-// Uses CoreGraphics via a helper or screencapture
+export interface CaptureDisplayResult {
+  ok: boolean;
+  permissionDenied: boolean;
+}
+
+// macOS-specific screen recording permission checks via CoreGraphics.
+// We shell out to Swift because Node.js cannot call these APIs directly.
 export function hasScreenRecordingPermission(): boolean | null {
-  // Node.js cannot directly access CGPreflightScreenCaptureAccess
-  // We'll rely on screencapture to fail if no permission
-  return null; // Unknown, let the actual capture tell us
+  return runPermissionCheck('CGPreflightScreenCaptureAccess()');
+}
+
+export function requestScreenRecordingPermission(): boolean | null {
+  return runPermissionCheck('CGRequestScreenCaptureAccess()');
 }
 
 export function isRunningUnderLaunchd(): boolean {
   return process.env['XPC_SERVICE_NAME'] !== undefined || !process.stdin.isTTY;
+}
+
+export function buildPermissionHelpMessage(background: boolean): string {
+  const suffix = background
+    ? '当前运行在后台任务中，不会自动弹出授权请求。请先在前台终端里手动运行一次 `s2r capture` 完成授权。'
+    : '请在“系统设置 > 隐私与安全性 > 屏幕与系统音频录制”中允许当前终端/应用，然后重新运行。';
+  return `Screen recording permission is required. ${suffix}`;
 }
 
 export function parseDisplayIndices(): number[] | null {
@@ -31,7 +46,7 @@ export function parseDisplayIndices(): number[] | null {
 export async function captureDisplay(
   outputPath: URL,
   displayIndex?: number
-): Promise<boolean> {
+): Promise<CaptureDisplayResult> {
   const args = ['-x', '-t', 'png'];
   if (displayIndex !== undefined) {
     args.push('-D', displayIndex.toString());
@@ -40,9 +55,16 @@ export async function captureDisplay(
 
   try {
     const result = await run('/usr/sbin/screencapture', args);
-    return result.exitCode === 0;
+    const errorText = `${result.stderr}\n${result.stdout}`.toLowerCase();
+    return {
+      ok: result.exitCode === 0,
+      permissionDenied: isScreenRecordingPermissionError(errorText),
+    };
   } catch {
-    return false;
+    return {
+      ok: false,
+      permissionDenied: false,
+    };
   }
 }
 
@@ -58,8 +80,13 @@ export async function captureScreenshots(
 
   for (const idx of displayIndices) {
     const path = new URL(`${timeString}_d${idx}.png`, screenshotDir);
-    if (await captureDisplay(path, idx)) {
+    const result = await captureDisplay(path, idx);
+    if (result.ok) {
       results.push(path);
+      continue;
+    }
+    if (result.permissionDenied) {
+      throw new Error(buildPermissionHelpMessage(isRunningUnderLaunchd()));
     }
   }
 
@@ -69,9 +96,53 @@ export async function captureScreenshots(
 
   // Fallback: capture without display index
   const fallback = new URL(`${timeString}.png`, screenshotDir);
-  if (!(await captureDisplay(fallback))) {
+  const result = await captureDisplay(fallback);
+  if (!result.ok) {
+    if (result.permissionDenied) {
+      throw new Error(buildPermissionHelpMessage(isRunningUnderLaunchd()));
+    }
     throw new Error('Screenshot failed');
   }
 
   return [fallback];
+}
+
+function runPermissionCheck(expression: string): boolean | null {
+  const tmpDir = process.env['TMPDIR'] ?? '/tmp';
+  const result = spawnSync(
+    '/usr/bin/env',
+    [
+      'CLANG_MODULE_CACHE_PATH=/tmp/s2r-swift-module-cache',
+      '/usr/bin/swift',
+      '-e',
+      `import CoreGraphics; print(${expression})`,
+    ],
+    {
+      encoding: 'utf-8',
+      env: {
+        ...process.env,
+        TMPDIR: tmpDir,
+      },
+    }
+  );
+
+  if (result.status !== 0) {
+    return null;
+  }
+
+  const output = (result.stdout ?? '').trim().toLowerCase();
+  if (output === 'true') return true;
+  if (output === 'false') return false;
+  return null;
+}
+
+function isScreenRecordingPermissionError(text: string): boolean {
+  return [
+    'screen recording',
+    'not authorized',
+    'not permitted',
+    'permission denied',
+    'operation not permitted',
+    'kcgerrornotauthorized',
+  ].some(pattern => text.includes(pattern));
 }

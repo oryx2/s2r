@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Build release package for screen2report
 
-VERSION="v0.2.0"
+VERSION="v0.2.2"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do

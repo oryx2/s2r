@@ -2,7 +2,7 @@
 import { Command } from 'commander';
 import { URL } from 'url';
 import { homedir } from 'os';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 import { runCapture } from './services/captureService';
 import { generateReport } from './services/reportService';
@@ -14,6 +14,15 @@ const program = new Command();
 
 function getBaseDir(): URL {
   return new URL('.screen-report/', `file://${homedir()}/`);
+}
+
+function resolveBaseDir(input?: string): URL {
+  if (!input) {
+    return getBaseDir();
+  }
+
+  const normalized = input.endsWith('/') ? input : `${input}/`;
+  return pathToFileURL(normalized);
 }
 
 function checkAPIKey(): boolean {
@@ -28,7 +37,7 @@ function isOllama(baseURL: string): boolean {
 program
   .name('s2r')
   .description('Screen2Report - 屏幕截图分析日报工具')
-  .version('0.2.0');
+  .version('0.2.2');
 
 program
   .command('status')
@@ -111,7 +120,7 @@ program
         process.exit(1);
       }
 
-      const baseDir = options.baseDir ? new URL(`file://${options.baseDir}`) : getBaseDir();
+      const baseDir = resolveBaseDir(options.baseDir);
       console.log('[INFO] Starting capture...');
       console.log(`[INFO] Base directory: ${fileURLToPath(baseDir)}`);
 
@@ -145,7 +154,7 @@ program
         process.exit(1);
       }
 
-      const baseDir = options.baseDir ? new URL(`file://${options.baseDir}`) : getBaseDir();
+      const baseDir = resolveBaseDir(options.baseDir);
       console.log('[INFO] Generating report...');
       console.log(`[INFO] Base directory: ${fileURLToPath(baseDir)}`);
       if (options.date) {
